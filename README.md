@@ -59,6 +59,6 @@ To ensure your code is always synced across different devices, follow these comm
       git push 
    ```
 
-  ## 📄 Academic Disclaimer
+## 📄 Academic Disclaimer
 This project is for educational use only as part of the requirements for CS Elective 1: Multi-Platform Development at Ateneo de Davao University. The school assets and branding used within this application are for academic demonstration purposes only.
    
