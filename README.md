@@ -27,7 +27,7 @@ To run this project locally for development or testing:
 
 1. **Clone the repository:**
    ```bash
-   git clone [https://github.com/BrnToLrn/university-lost-and-found.git](https://github.com/BrnToLrn/university-lost-and-found.git)
+   git clone https://github.com/BrnToLrn/university-lost-and-found.git
     ```
 
 2. Navigate to the directory
@@ -45,19 +45,6 @@ To run this project locally for development or testing:
       flutter run
    ```
 
-## 💻 Development Workflow
-To ensure your code is always synced across different devices, follow these commands:
-- Pull latest changes
-  ```bash
-      git pull origin main
-   ```
-- Save and sync progress
-  ```bash
-      git add .
-      git commit
-      git commit -m "Update message"
-      git push 
-   ```
 
 ## 📄 Academic Disclaimer
 This project is for educational use only as part of the requirements for CS Elective 1: Multi-Platform Development at Ateneo de Davao University. The school assets and branding used within this application are for academic demonstration purposes only.
