@@ -19,11 +19,13 @@ class DashboardScreen extends StatelessWidget {
       body: StreamBuilder<List<Map<String, dynamic>>>(
         stream: supabase.from('items').stream(primaryKey: ['id']),
         builder: (context, snapshot) {
-          if (!snapshot.hasData)
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
+          }
           final items = snapshot.data!;
-          if (items.isEmpty)
+          if (items.isEmpty) {
             return const Center(child: Text('No items found.'));
+          }
 
           return ListView.builder(
             itemCount: items.length,

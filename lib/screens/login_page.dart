@@ -22,12 +22,13 @@ class _LoginPageState extends State<LoginPage> {
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Registration successful! Check your email.'),
             ),
           );
+        }
       } else {
         await supabase.auth.signInWithPassword(
           email: _emailController.text.trim(),
@@ -35,6 +36,7 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
     } on AuthException catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message), backgroundColor: Colors.red),
       );
