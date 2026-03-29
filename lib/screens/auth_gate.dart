@@ -10,7 +10,6 @@ class AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<AuthState>(
-      // Listens for login/logout changes in real-time
       stream: supabase.auth.onAuthStateChange,
       builder: (context, snapshot) {
         final session = supabase.auth.currentSession;
@@ -19,7 +18,6 @@ class AuthGate extends StatelessWidget {
           return const DashboardScreen();
         }
 
-        // Otherwise, stay on the login screen
         return const AuthScreen();
       },
     );

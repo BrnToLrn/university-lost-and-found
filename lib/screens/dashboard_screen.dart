@@ -8,7 +8,7 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ADDU Lost & Found'),
+        title: const Text('University Lost & Found'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),

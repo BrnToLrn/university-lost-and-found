@@ -1,82 +1,46 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../main.dart';
+import 'package:supabase_auth_ui/supabase_auth_ui.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-class AuthScreen extends StatefulWidget {
+class AuthScreen extends StatelessWidget {
   const AuthScreen({super.key});
-  @override
-  State<AuthScreen> createState() => _AuthScreenState();
-}
 
-class _AuthScreenState extends State<AuthScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _otpController = TextEditingController();
-  bool _isLoading = false;
-  bool _isSignUp = false;
-
-  Future<void> _handleAuth() async {
-    setState(() => _isLoading = true);
-    try {
-      if (_isSignUp) {
-        await supabase.auth.signUp(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
-        if (mounted) _showOtpDialog();
-      } else {
-        await supabase.auth.signInWithPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
-      }
-    } on AuthException catch (e) {
-      _showError(e.message);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _verifyOtp() async {
-    try {
-      await supabase.auth.verifyOTP(
-        email: _emailController.text.trim(),
-        token: _otpController.text.trim(),
-        type: OtpType.signup,
-      );
-      if (mounted) Navigator.of(context).pop();
-    } on AuthException catch (e) {
-      _showError(e.message);
-    }
-  }
-
-  Future<void> _signInAsGuest() async {
-    try {
-      await supabase.auth.signInAnonymously();
-    } on AuthException catch (e) {
-      _showError(e.message);
-    }
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
-  }
-
-  void _showOtpDialog() {
+  void _showOtpDialog(BuildContext context, String email) {
+    final otpController = TextEditingController();
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: const Text('Verify Email PIN'),
         content: TextField(
-          controller: _otpController,
+          controller: otpController,
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(hintText: 'Enter 6-digit code'),
         ),
         actions: [
-          ElevatedButton(onPressed: _verifyOtp, child: const Text('Confirm')),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await Supabase.instance.client.auth.verifyOTP(
+                  email: email,
+                  token: otpController.text.trim(),
+                  type: OtpType.signup,
+                );
+
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Invalid PIN: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('Confirm'),
+          ),
         ],
       ),
     );
@@ -85,70 +49,93 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 32.0),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.travel_explore, size: 80, color: Colors.blue),
-              const SizedBox(height: 20),
+              const SizedBox(height: 60), // Top spacing
+              const Icon(
+                Icons.travel_explore,
+                size: 80,
+                color: Color(0xFF003366),
+              ),
+              const SizedBox(height: 10),
               Text(
-                _isSignUp ? 'Join Lost & Found' : 'Welcome Back',
-                style: const TextStyle(
+                'ADDU Lost & Found',
+                style: GoogleFonts.montserrat(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
+                  color: const Color(0xFF003366),
                 ),
               ),
               const SizedBox(height: 30),
-              TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'University Email',
-                  border: OutlineInputBorder(),
-                ),
+              SupaEmailAuth(
+                redirectTo: 'io.supabase.flutter://login-callback/',
+                onSignInComplete: (response) {},
+                onSignUpComplete: (response) {
+                  if (!context.mounted) return;
+                  _showOtpDialog(context, response.user?.email ?? '');
+                },
               ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: _passwordController,
-                decoration: const InputDecoration(
-                  labelText: 'Password',
-                  border: OutlineInputBorder(),
-                ),
-                obscureText: true,
-              ),
-              const SizedBox(height: 25),
-              _isLoading
-                  ? const CircularProgressIndicator()
-                  : SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _handleAuth,
-                        child: Text(
-                          _isSignUp ? 'Register & Send PIN' : 'Sign In',
-                        ),
+
+              // FIXED: Reduced gap with an "OR" label
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10.0),
+                child: Row(
+                  children: [
+                    const Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Text(
+                        "OR",
+                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
                       ),
                     ),
-              TextButton(
-                onPressed: () => setState(() => _isSignUp = !_isSignUp),
-                child: Text(
-                  _isSignUp
-                      ? 'Already have an account? Login'
-                      : 'New user? Register with PIN',
+                    const Expanded(child: Divider()),
+                  ],
                 ),
               ),
-              const Divider(height: 40),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.g_mobiledata, size: 30),
-                label: const Text('Sign in with Google'),
-                onPressed: () =>
-                    supabase.auth.signInWithOAuth(OAuthProvider.google),
+
+              SupaSocialsAuth(
+                socialProviders: [OAuthProvider.google],
+                onSuccess: (response) {},
+                onError: (error) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $error'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                },
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               OutlinedButton.icon(
                 icon: const Icon(Icons.person_outline),
                 label: const Text('Continue as Guest'),
-                onPressed: _signInAsGuest,
+                onPressed: () async {
+                  try {
+                    await Supabase.instance.client.auth.signInAnonymously();
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Guest Login Failed: $e')),
+                    );
+                  }
+                },
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                  side: const BorderSide(color: Color(0xFF003366)),
+                  foregroundColor: const Color(0xFF003366),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
+              const SizedBox(height: 40),
             ],
           ),
         ),
