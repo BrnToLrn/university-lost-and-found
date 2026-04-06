@@ -17,7 +17,6 @@ class DashboardScreen extends StatelessWidget {
         ],
       ),
       body: StreamBuilder<List<Map<String, dynamic>>>(
-        // Ensure 'id' is the primary key in your Supabase 'items' table
         stream: supabase.from('items').stream(primaryKey: ['id']),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
@@ -39,15 +38,15 @@ class DashboardScreen extends StatelessWidget {
             itemBuilder: (context, index) {
               final item = items[index];
 
-              // Safe data extraction to prevent null-pointer crashes
-              final String itemName = (item['name'] ?? 'Unknown').toString();
+              final String itemName = (item['title'] ?? 'Unknown').toString();
               final String description = (item['description'] ?? '').toString();
+              final String location = (item['location'] ?? 'No location')
+                  .toString();
               final String itemType = (item['type'] ?? 'unknown')
                   .toString()
                   .toLowerCase();
               final String? imageUrl = item['image_url']?.toString();
 
-              // Determine status color
               final Color statusColor = itemType == 'found'
                   ? Colors.green
                   : Colors.orange;
@@ -55,26 +54,55 @@ class DashboardScreen extends StatelessWidget {
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: ListTile(
-                  leading: SizedBox(
-                    width: 50,
-                    height: 50,
-                    child: (imageUrl != null && imageUrl.isNotEmpty)
-                        ? Image.network(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(Icons.broken_image),
-                          )
-                        : const Icon(Icons.image),
+                  leading: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: SizedBox(
+                      width: 50,
+                      height: 50,
+                      child: (imageUrl != null && imageUrl.isNotEmpty)
+                          ? Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Icon(
+                                    Icons.broken_image,
+                                    color: Colors.grey,
+                                  ),
+                            )
+                          : const Icon(Icons.image, color: Colors.grey),
+                    ),
                   ),
                   title: Text(
                     itemName,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  subtitle: Text(
-                    description,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        description,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on,
+                            size: 12,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            location,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                   trailing: Container(
                     padding: const EdgeInsets.symmetric(
@@ -82,6 +110,7 @@ class DashboardScreen extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
                       border: Border.all(color: statusColor),
                       borderRadius: BorderRadius.circular(4),
                     ),

@@ -7,14 +7,13 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
-    url: 'https://kptcqhdiszsjzqyxszjg.supabase.co', //
-    anonKey: 'sb_publishable_l8T-n4Ro0ChubQx5ExIIqw_mSeTqCGi', //
+    url: 'https://kptcqhdiszsjzqyxszjg.supabase.co',
+    anonKey: 'sb_publishable_l8T-n4Ro0ChubQx5ExIIqw_mSeTqCGi',
   );
 
   runApp(const MyApp());
 }
 
-// Global access to Supabase client
 final supabase = Supabase.instance.client;
 
 class MyApp extends StatelessWidget {
@@ -29,9 +28,9 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
         textTheme: GoogleFonts.montserratTextTheme(Theme.of(context).textTheme),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF003366), // University Blue
+          seedColor: const Color(0xFF003366),
           primary: const Color(0xFF003366),
-          secondary: const Color(0xFFFFCC00), // University Gold
+          secondary: const Color(0xFFFFCC00),
         ),
       ),
       home: const AuthGate(),
