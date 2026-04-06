@@ -2,48 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:supabase_auth_ui/supabase_auth_ui.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class AuthScreen extends StatelessWidget {
+class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
-  void _showOtpDialog(BuildContext context, String email) {
-    final otpController = TextEditingController();
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Verify Email PIN'),
-        content: TextField(
-          controller: otpController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(hintText: 'Enter 6-digit code'),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await Supabase.instance.client.auth.verifyOTP(
-                  email: email,
-                  token: otpController.text.trim(),
-                  type: OtpType.signup,
-                );
+  @override
+  State<AuthScreen> createState() => _AuthScreenState();
+}
 
-                if (!context.mounted) return;
-                Navigator.of(context).pop();
-              } catch (e) {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Invalid PIN: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
-    );
+class _AuthScreenState extends State<AuthScreen> {
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  Future<void> _setUserRole(String userId, String role) async {
+    try {
+      await Supabase.instance.client.from('users').upsert({
+        'id': userId,
+        'role': role,
+      }).select();
+    } catch (e) {
+      debugPrint('Error setting user role: $e');
+    }
   }
 
   @override
@@ -56,7 +41,7 @@ class AuthScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const SizedBox(height: 60), // Top spacing
+              const SizedBox(height: 60),
               const Icon(
                 Icons.travel_explore,
                 size: 80,
@@ -64,7 +49,7 @@ class AuthScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                'ADDU Lost & Found',
+                'University Lost & Found',
                 style: GoogleFonts.montserrat(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -73,15 +58,14 @@ class AuthScreen extends StatelessWidget {
               ),
               const SizedBox(height: 30),
               SupaEmailAuth(
-                redirectTo: 'io.supabase.flutter://login-callback/',
-                onSignInComplete: (response) {},
+                redirectTo: 'io.supabase.flutter://login-callback',
+                onSignInComplete: (response) {
+                  _setUserRole(response.user!.id, 'viewer');
+                },
                 onSignUpComplete: (response) {
-                  if (!context.mounted) return;
-                  _showOtpDialog(context, response.user?.email ?? '');
+                  _setUserRole(response.user!.id, 'viewer');
                 },
               ),
-
-              // FIXED: Reduced gap with an "OR" label
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 10.0),
                 child: Row(
@@ -101,7 +85,9 @@ class AuthScreen extends StatelessWidget {
 
               SupaSocialsAuth(
                 socialProviders: [OAuthProvider.google],
-                onSuccess: (response) {},
+                onSuccess: (response) {
+                  _setUserRole(response.user!.id, 'viewer');
+                },
                 onError: (error) {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -118,7 +104,9 @@ class AuthScreen extends StatelessWidget {
                 label: const Text('Continue as Guest'),
                 onPressed: () async {
                   try {
-                    await Supabase.instance.client.auth.signInAnonymously();
+                    final response = await Supabase.instance.client.auth
+                        .signInAnonymously();
+                    _setUserRole(response.user!.id, 'viewer');
                   } catch (e) {
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(

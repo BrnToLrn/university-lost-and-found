@@ -24,14 +24,14 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'ADDU Lost & Found',
+      title: 'University Lost & Found',
       theme: ThemeData(
         useMaterial3: true,
         textTheme: GoogleFonts.montserratTextTheme(Theme.of(context).textTheme),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF003366), // ADDU Blue
+          seedColor: const Color(0xFF003366), // University Blue
           primary: const Color(0xFF003366),
-          secondary: const Color(0xFFFFCC00), // ADDU Gold
+          secondary: const Color(0xFFFFCC00), // University Gold
         ),
       ),
       home: const AuthGate(),
