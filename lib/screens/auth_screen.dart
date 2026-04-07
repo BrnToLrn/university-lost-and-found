@@ -85,6 +85,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
               SupaSocialsAuth(
                 socialProviders: [OAuthProvider.google],
+                redirectUrl: 'io.supabase.flutter://login-callback',
                 onSuccess: (response) {
                   _setUserRole(response.user!.id, 'viewer');
                 },
