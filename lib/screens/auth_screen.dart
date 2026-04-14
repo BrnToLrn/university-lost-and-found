@@ -25,9 +25,19 @@ class _AuthScreenState extends State<AuthScreen> {
       await Supabase.instance.client.from('users').upsert({
         'id': userId,
         'role': role,
+        'first_name': '',
+        'middle_name': '',
+        'last_name': '',
+        'contact': '',
+        'student_id': '',
       }).select();
+      debugPrint('User record created/updated successfully');
     } catch (e) {
       debugPrint('Error setting user role: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error creating user profile: $e')),
+      );
     }
   }
 
@@ -87,7 +97,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 socialProviders: [OAuthProvider.google],
                 redirectUrl: 'io.supabase.flutter://login-callback',
                 onSuccess: (response) {
-                  _setUserRole(response.user!.id, 'viewer');
+                  _setUserRole(response.user.id, 'viewer');
                 },
                 onError: (error) {
                   if (!context.mounted) return;

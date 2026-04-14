@@ -11,7 +11,16 @@ class ItemDetailsScreen extends StatelessWidget {
     return FutureBuilder<String>(
       future: _getCategoryName(),
       builder: (context, categorySnapshot) {
-        return _buildDetails(context, categorySnapshot.data ?? 'Uncategorized');
+        return FutureBuilder<String>(
+          future: _getSubmittedByName(item['user_id']),
+          builder: (context, submittedBySnapshot) {
+            return _buildDetails(
+              context,
+              categorySnapshot.data ?? 'Uncategorized',
+              submittedBySnapshot.data ?? 'Unknown',
+            );
+          },
+        );
       },
     );
   }
@@ -33,7 +42,38 @@ class ItemDetailsScreen extends StatelessWidget {
     }
   }
 
-  Widget _buildDetails(BuildContext context, String category) {
+  Future<String> _getSubmittedByName(String? userId) async {
+    if (userId == null) return 'Unknown';
+    try {
+      final response = await supabase
+          .from('users')
+          .select('first_name, middle_name, last_name')
+          .eq('id', userId)
+          .single();
+
+      final firstName = response['first_name'] ?? '';
+      final middleName = response['middle_name'] ?? '';
+      final lastName = response['last_name'] ?? '';
+
+      final nameParts = [
+        firstName,
+        middleName,
+        lastName,
+      ].where((part) => part.isNotEmpty).toList();
+      final fullName = nameParts.join(' ');
+
+      return fullName.isNotEmpty ? fullName : 'Unknown';
+    } catch (e) {
+      debugPrint('Error fetching user: $e');
+      return 'Unknown';
+    }
+  }
+
+  Widget _buildDetails(
+    BuildContext context,
+    String category,
+    String submittedBy,
+  ) {
     debugPrint('Item data: $item');
     final String itemName = (item['title'] ?? 'Unnamed Item').toString();
     final String description =
@@ -42,13 +82,9 @@ class ItemDetailsScreen extends StatelessWidget {
     final String itemType = (item['type'] ?? 'unknown')
         .toString()
         .toLowerCase();
+    final String status = (item['status'] ?? 'OPEN').toString().toUpperCase();
+    final String itemId = item['id'].toString();
     final String? imageUrl = item['image_url']?.toString();
-    final String createdAt =
-        item['created_at']?.toString().split('T')[0] ?? 'Recently';
-    final String referenceId = item['id']
-        .toString()
-        .substring(0, 8)
-        .toUpperCase();
 
     final Color typeColor = itemType == 'found' ? Colors.green : Colors.orange;
     final Color typeBackgroundColor = itemType == 'found'
@@ -140,53 +176,30 @@ class ItemDetailsScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  _buildInfoRow(Icons.tag_outlined, "Item ID", itemId),
                   _buildInfoRow(
-                    Icons.location_on_outlined,
-                    "Precise Location",
-                    location,
-                  ),
-                  _buildInfoRow(
-                    Icons.calendar_today_outlined,
-                    "Date Logged",
-                    createdAt,
+                    Icons.description_outlined,
+                    "Description",
+                    description,
                   ),
                   _buildInfoRow(
                     Icons.category_outlined,
-                    "Item Category",
-                    category,
+                    "Type",
+                    itemType.toUpperCase(),
+                  ),
+                  _buildInfoRow(Icons.info_outlined, "Status", status),
+                  _buildInfoRow(Icons.category_outlined, "Category", category),
+                  _buildInfoRow(
+                    Icons.location_on_outlined,
+                    "Location",
+                    location,
                   ),
                   _buildInfoRow(
-                    Icons.contact_mail_outlined,
-                    "Contact Method",
-                    "Visit University Office",
+                    Icons.person_outlined,
+                    "Submitted By",
+                    submittedBy,
                   ),
-                  _buildInfoRow(
-                    Icons.tag_outlined,
-                    "Reference ID",
-                    "#$referenceId",
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 10),
-                    child: Divider(color: Color(0xFFEEEEEE), thickness: 2),
-                  ),
-                  const Text(
-                    "Additional Notes",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF003366),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    description,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      height: 1.6,
-                      color: Color(0xFF424242),
-                    ),
-                  ),
-                  const SizedBox(height: 60),
+                  const SizedBox(height: 40),
                 ],
               ),
             ),
