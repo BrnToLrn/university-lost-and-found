@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
+import 'item_details.dart';
+import 'myaccount_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -8,11 +10,18 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('University Lost & Found'),
+        title: const Text('UniFind'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () => supabase.auth.signOut(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.account_circle),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const MyAccountScreen()),
+            ),
           ),
         ],
       ),
@@ -54,6 +63,14 @@ class DashboardScreen extends StatelessWidget {
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: ListTile(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ItemDetailsScreen(item: item),
+                      ),
+                    );
+                  },
                   leading: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: SizedBox(
@@ -110,7 +127,7 @@ class DashboardScreen extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
+                      color: statusColor.withValues(alpha: 0.1),
                       border: Border.all(color: statusColor),
                       borderRadius: BorderRadius.circular(4),
                     ),
