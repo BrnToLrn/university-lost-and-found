@@ -1,10 +1,49 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 
-class ItemDetailsScreen extends StatelessWidget {
+class ItemDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> item;
 
   const ItemDetailsScreen({super.key, required this.item});
+
+  @override
+  State<ItemDetailsScreen> createState() => _ItemDetailsScreenState();
+}
+
+class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
+  late Future<String?> _userClaimStatusFuture;
+  late Future<bool> _hasApprovedClaimFuture;
+  final TextEditingController _claimMessageController = TextEditingController();
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshData();
+
+    // Refresh data every 3 seconds to check for admin updates
+    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted) {
+        setState(() {
+          _refreshData();
+        });
+      }
+    });
+  }
+
+  void _refreshData() {
+    _userClaimStatusFuture = _getUserClaimStatus();
+    _hasApprovedClaimFuture = _hasApprovedClaim();
+  }
+
+  @override
+  void dispose() {
+    _claimMessageController.dispose();
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,12 +51,24 @@ class ItemDetailsScreen extends StatelessWidget {
       future: _getCategoryName(),
       builder: (context, categorySnapshot) {
         return FutureBuilder<String>(
-          future: _getSubmittedByName(item['user_id']),
+          future: _getSubmittedByName(widget.item['user_id']),
           builder: (context, submittedBySnapshot) {
-            return _buildDetails(
-              context,
-              categorySnapshot.data ?? 'Uncategorized',
-              submittedBySnapshot.data ?? 'Unknown',
+            return FutureBuilder<String?>(
+              future: _userClaimStatusFuture,
+              builder: (context, claimSnapshot) {
+                return FutureBuilder<bool>(
+                  future: _hasApprovedClaimFuture,
+                  builder: (context, approvedSnapshot) {
+                    return _buildDetails(
+                      context,
+                      categorySnapshot.data ?? 'Uncategorized',
+                      submittedBySnapshot.data ?? 'Unknown',
+                      claimSnapshot.data,
+                      approvedSnapshot.data ?? false,
+                    );
+                  },
+                );
+              },
             );
           },
         );
@@ -25,9 +76,231 @@ class ItemDetailsScreen extends StatelessWidget {
     );
   }
 
+  Future<bool> _hasApprovedClaim() async {
+    try {
+      final response = await supabase
+          .from('claims')
+          .select('id')
+          .eq('item_id', widget.item['id'])
+          .eq('status', 'approved')
+          .maybeSingle();
+
+      final hasApproved = response != null;
+      debugPrint(
+        'DEBUG: Checking approved claims for item ${widget.item['id']}',
+      );
+      debugPrint('DEBUG: Has approved claim: $hasApproved');
+      return hasApproved;
+    } catch (e) {
+      debugPrint('Error checking approved claims: $e');
+      return false;
+    }
+  }
+
+  Future<String?> _getUserClaimStatus() async {
+    final user = supabase.auth.currentUser;
+
+    // Return null if user is not logged in or is guest
+    if (user == null || user.email == null || user.email!.isEmpty) return null;
+
+    try {
+      final response = await supabase
+          .from('claims')
+          .select('id, status')
+          .eq('item_id', widget.item['id'])
+          .eq('claimant_id', user.id)
+          .maybeSingle();
+
+      if (response == null) return null;
+      return response['status'] as String?;
+    } catch (e) {
+      debugPrint('Error checking claim status: $e');
+      return null;
+    }
+  }
+
+  Future<void> _submitClaim(BuildContext context) async {
+    final user = supabase.auth.currentUser;
+
+    // Check if user is not logged in or is a guest
+    if (user == null || user.email == null || user.email!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be logged in to claim an item')),
+      );
+      return;
+    }
+
+    debugPrint('Submitting claim for user: ${user.email}');
+
+    try {
+      final claimResponse = await supabase
+          .from('claims')
+          .insert({
+            'item_id': widget.item['id'],
+            'claimant_id': user.id,
+            'claim_details': _claimMessageController.text.isNotEmpty
+                ? _claimMessageController.text
+                : null,
+            'status': 'pending',
+          })
+          .select()
+          .single();
+
+      // Notify admin about the new claim
+      await _notifyAdminOfNewClaim(user.id, claimResponse['id']);
+
+      _claimMessageController.clear();
+
+      if (context.mounted) {
+        setState(() {
+          _userClaimStatusFuture = _getUserClaimStatus();
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Claim submitted successfully! Awaiting approval.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } on PostgrestException catch (e) {
+      debugPrint('PostgreSQL Error Code: ${e.code}');
+      debugPrint('PostgreSQL Error Message: ${e.message}');
+      debugPrint('PostgreSQL Error Details: ${e.details}');
+      debugPrint('Current User ID: ${user.id}');
+      debugPrint('Item ID: ${widget.item['id']}');
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error submitting claim: ${e.message}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error submitting claim: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      debugPrint('Error submitting claim: $e');
+    }
+  }
+
+  Future<void> _notifyAdminOfNewClaim(
+    dynamic claimantId,
+    dynamic claimId,
+  ) async {
+    try {
+      // Get claimant user data
+      final claimantData = await supabase
+          .from('users')
+          .select('first_name, last_name, email')
+          .eq('id', claimantId)
+          .single();
+
+      final claimantName =
+          '${claimantData['first_name']} ${claimantData['last_name']}';
+      final claimantEmail = claimantData['email'];
+
+      // Get item data
+      final itemData = await supabase
+          .from('items')
+          .select('title, type, location')
+          .eq('id', widget.item['id'])
+          .single();
+
+      // Get item owner data
+      final ownerData = await supabase
+          .from('users')
+          .select('email')
+          .eq('id', widget.item['user_id'])
+          .single();
+
+      // Create admin notification in database
+      await supabase.from('notifications').insert({
+        'type': 'new_claim',
+        'title': 'New Claim Submitted',
+        'message':
+            '$claimantName has submitted a claim for "${itemData['title']}" (${itemData['type'].toString().toUpperCase()})',
+        'claim_id': claimId,
+        'item_id': widget.item['id'],
+        'claimant_id': claimantId,
+        'claimant_email': claimantEmail,
+        'item_owner_email': ownerData['email'],
+        'status': 'unread',
+      });
+
+      debugPrint('Admin notification created for claim: $claimId');
+    } catch (e) {
+      debugPrint('Error creating admin notification: $e');
+      // Don't fail the claim submission if notification fails
+    }
+  }
+
+  void _showClaimDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Claim Item'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Are you sure you want to claim this item?',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Add a message (optional):',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _claimMessageController,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText:
+                      'E.g., "This is my laptop. I have proof of purchase..."',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding: const EdgeInsets.all(12),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _submitClaim(context);
+            },
+            child: const Text('Submit Claim'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<String> _getCategoryName() async {
     try {
-      final categoryId = item['category_id'];
+      final categoryId = widget.item['category_id'];
       if (categoryId == null) return 'Uncategorized';
 
       final response = await supabase
@@ -73,18 +346,23 @@ class ItemDetailsScreen extends StatelessWidget {
     BuildContext context,
     String category,
     String submittedBy,
+    String? claimStatus,
+    bool hasApprovedClaim,
   ) {
-    debugPrint('Item data: $item');
-    final String itemName = (item['title'] ?? 'Unnamed Item').toString();
+    debugPrint('Item data: ${widget.item}');
+    final String itemName = (widget.item['title'] ?? 'Unnamed Item').toString();
     final String description =
-        (item['description'] ?? 'No description provided.').toString();
-    final String location = (item['location'] ?? 'Not specified').toString();
-    final String itemType = (item['type'] ?? 'unknown')
+        (widget.item['description'] ?? 'No description provided.').toString();
+    final String location = (widget.item['location'] ?? 'Not specified')
+        .toString();
+    final String itemType = (widget.item['type'] ?? 'unknown')
         .toString()
         .toLowerCase();
-    final String status = (item['status'] ?? 'OPEN').toString().toUpperCase();
-    final String itemId = item['id'].toString();
-    final String? imageUrl = item['image_url']?.toString();
+    final String status = (widget.item['status'] ?? 'OPEN')
+        .toString()
+        .toUpperCase();
+    final String itemId = widget.item['id'].toString();
+    final String? imageUrl = widget.item['image_url']?.toString();
 
     final Color typeColor = itemType == 'found' ? Colors.green : Colors.orange;
     final Color typeBackgroundColor = itemType == 'found'
@@ -114,7 +392,7 @@ class ItemDetailsScreen extends StatelessWidget {
           children: [
             // Header Image
             Hero(
-              tag: 'item-${item['id']}',
+              tag: 'item-${widget.item['id']}',
               child: Container(
                 height: 400,
                 width: double.infinity,
@@ -199,11 +477,200 @@ class ItemDetailsScreen extends StatelessWidget {
                     "Submitted By",
                     submittedBy,
                   ),
+                  const SizedBox(height: 24),
+                  _buildClaimButton(context, claimStatus, hasApprovedClaim),
                   const SizedBox(height: 40),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClaimButton(
+    BuildContext context,
+    String? claimStatus,
+    bool hasApprovedClaim,
+  ) {
+    debugPrint(
+      'DEBUG: _buildClaimButton called with hasApprovedClaim: $hasApprovedClaim, claimStatus: $claimStatus',
+    );
+
+    final user = supabase.auth.currentUser;
+
+    // Check if user is not logged in or is a guest (no email)
+    final isGuest = user == null || user.email == null || user.email!.isEmpty;
+    final isOwnItem = user != null && user.id == widget.item['user_id'];
+
+    if (isGuest) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.blue[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.blue),
+        ),
+        child: const Text(
+          'Please login to claim this item',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.blue,
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
+      );
+    }
+
+    if (isOwnItem) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: const Text(
+          'This is your item',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.grey,
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
+      );
+    }
+
+    if (hasApprovedClaim) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: const Text(
+          'Item Already Claimed',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.grey,
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
+      );
+    }
+
+    if (claimStatus == 'pending') {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.orange[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.orange),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.hourglass_top, color: Colors.orange, size: 18),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'Claim Pending - Awaiting Approval',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.orange,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (claimStatus == 'approved') {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.green[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.green),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 18),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'Claim Approved',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (claimStatus == 'rejected') {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.red[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.red),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cancel, color: Colors.red, size: 18),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'Claim Rejected',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () => _showClaimDialog(context),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF003366),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        icon: const Icon(Icons.touch_app),
+        label: const Text(
+          'Claim This Item',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ),
     );

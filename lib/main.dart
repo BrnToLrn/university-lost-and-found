@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'University Lost & Found',
+      title: 'UniFind',
       theme: ThemeData(
         useMaterial3: true,
         textTheme: GoogleFonts.montserratTextTheme(Theme.of(context).textTheme),
