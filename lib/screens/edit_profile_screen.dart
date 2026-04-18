@@ -67,7 +67,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             'last_name': lastNameController.text.trim(),
             'contact': contactController.text.trim(),
             'student_id': studentIdController.text.trim(),
-            'role': 'viewer',
           })
           .eq('id', user.id);
 
