@@ -45,30 +45,34 @@ class _MyAccountScreenState extends State<MyAccountScreen> {
   @override
   Widget build(BuildContext context) {
     final user = supabase.auth.currentUser;
+    final isGuest = user == null || user.email == null || user.email!.isEmpty;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Account'),
         centerTitle: false,
         actions: [
-          TextButton.icon(
-            onPressed: () async {
-              final userData = await _getUserData(user?.id ?? '');
-              if (context.mounted) {
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => EditProfileScreen(userData: userData),
-                  ),
-                );
-                if (result == true) {
-                  _refreshUserData();
+          // Only show Edit Profile button if user is not a guest
+          if (!isGuest)
+            TextButton.icon(
+              onPressed: () async {
+                final userData = await _getUserData(user.id);
+                if (context.mounted) {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          EditProfileScreen(userData: userData),
+                    ),
+                  );
+                  if (result == true) {
+                    _refreshUserData();
+                  }
                 }
-              }
-            },
-            icon: const Icon(Icons.edit),
-            label: const Text('Edit Profile'),
-          ),
+              },
+              icon: const Icon(Icons.edit),
+              label: const Text('Edit Profile'),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _refreshUserData,
@@ -86,10 +90,12 @@ class _MyAccountScreenState extends State<MyAccountScreen> {
           final firstName = userData['first_name'] ?? '';
           final middleName = userData['middle_name'] ?? '';
           final lastName = userData['last_name'] ?? '';
-          final email = user?.email ?? '';
+          final email = user?.email ?? 'Guest User';
           final userId = user?.id ?? '';
           final contact = userData['contact'] ?? '';
           final studentId = userData['student_id'] ?? '';
+          final isGuestUser =
+              user == null || user.email == null || user.email!.isEmpty;
 
           final fullName = [
             firstName,
@@ -137,6 +143,48 @@ class _MyAccountScreenState extends State<MyAccountScreen> {
                     ],
                   ),
                   const SizedBox(height: 32),
+
+                  // Show guest notice if user is a guest
+                  if (isGuestUser)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.orange[50],
+                        border: Border.all(color: Colors.orange),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: Colors.orange[700],
+                              ),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Text(
+                                  'Guest users cannot edit their profile.',
+                                  style: TextStyle(
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Log in with your email or Google account to edit your profile and claim items.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (isGuestUser) const SizedBox(height: 24),
 
                   _buildDetailRow(
                     Icons.fingerprint_outlined,

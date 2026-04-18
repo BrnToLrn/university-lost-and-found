@@ -1,10 +1,52 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../main.dart';
 import 'item_details.dart';
 import 'myaccount_screen.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  late Future<List<Map<String, dynamic>>> _itemsFuture;
+  late Timer _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _itemsFuture = _fetchItems();
+    // Refresh items every 3 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted) {
+        setState(() {
+          _itemsFuture = _fetchItems();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer.cancel();
+    super.dispose();
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchItems() async {
+    try {
+      final response = await supabase
+          .from('items')
+          .select()
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error fetching items: $e');
+      return [];
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,11 +67,29 @@ class DashboardScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: supabase.from('items').stream(primaryKey: ['id']),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _itemsFuture,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(child: Text('Stream Error: ${snapshot.error}'));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  const SizedBox(height: 16),
+                  const Text('Error loading items'),
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _itemsFuture = _fetchItems();
+                      });
+                    },
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
           }
 
           if (!snapshot.hasData) {

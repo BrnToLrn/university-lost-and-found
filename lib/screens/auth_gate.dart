@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
-import 'auth_screen.dart';
+import 'login_page.dart';
 import 'dashboard_screen.dart';
 
 class AuthGate extends StatelessWidget {
@@ -18,7 +18,7 @@ class AuthGate extends StatelessWidget {
           return const DashboardScreen();
         }
 
-        return const AuthScreen();
+        return const LoginPage();
       },
     );
   }

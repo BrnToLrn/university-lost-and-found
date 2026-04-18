@@ -130,6 +130,30 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
       return;
     }
 
+    // Check if item is closed or already claimed
+    final itemStatus = (widget.item['status'] ?? 'OPEN')
+        .toString()
+        .toUpperCase();
+    if (itemStatus == 'CLOSED') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This item is closed and no longer accepting claims'),
+          backgroundColor: Colors.grey,
+        ),
+      );
+      return;
+    }
+
+    if (itemStatus == 'CLAIMED') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This item has already been claimed'),
+          backgroundColor: Colors.grey,
+        ),
+      );
+      return;
+    }
+
     debugPrint('Submitting claim for user: ${user.email}');
 
     try {
@@ -504,6 +528,13 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
     final isGuest = user == null || user.email == null || user.email!.isEmpty;
     final isOwnItem = user != null && user.id == widget.item['user_id'];
 
+    // Check item status
+    final itemStatus = (widget.item['status'] ?? 'OPEN')
+        .toString()
+        .toUpperCase();
+    final isItemClosed = itemStatus == 'CLOSED';
+    final isItemClaimed = itemStatus == 'CLAIMED';
+
     if (isGuest) {
       return Container(
         width: double.infinity,
@@ -518,6 +549,48 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Colors.blue,
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
+      );
+    }
+
+    if (isItemClosed) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: const Text(
+          'Item Closed',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.grey,
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
+      );
+    }
+
+    if (isItemClaimed) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: const Text(
+          'Item Already Claimed',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.grey,
             fontWeight: FontWeight.w500,
             fontSize: 14,
           ),
