@@ -47,5 +47,5 @@ flutter run
 
 
 ## 📄 Academic Disclaimer
-This project is for educational use only as part of the requirements for CS Elective 1: Multi-Platform Development at Ateneo de Davao University. The school assets and branding used within this application are for academic demonstration purposes only.
+This project is for educational use only as part of the requirements for CS Elective 1: Multi-Platform Development at Ateneo de Davao University.
    
